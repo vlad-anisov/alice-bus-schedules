@@ -3,4 +3,4 @@
 start_server.bat
 ngrok.exe
 db.sqlite3
-.idea
+.idea/
