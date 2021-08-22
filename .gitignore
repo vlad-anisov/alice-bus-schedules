@@ -1,0 +1,5 @@
+/venv/
+/venv_pypy/
+start_server.bat
+ngrok.exe
+db.sqlite3

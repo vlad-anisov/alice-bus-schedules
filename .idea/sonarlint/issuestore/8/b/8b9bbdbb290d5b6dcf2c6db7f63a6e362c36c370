@@ -1,0 +1,5 @@
+
+npython:S1192"XDefine a constant instead of duplicating this literal 'varchar(%(max_length)s)' 4 times.(€²Üý
+jpython:S1192"ODefine a constant instead of duplicating this literal 'LIKE UPPER(%s)' 3 times.(—ªÙ‹ýÿÿÿÿ
+hpython:S1192"RDefine a constant instead of duplicating this literal '"%(column)s" >= 0' 3 times.(¥¿þî
+Jpython:S1066"/Merge this if statement with the enclosing one.(ƒúÿÏýÿÿÿÿ
