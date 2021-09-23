@@ -85,11 +85,11 @@ async def get_schedule_for_date(bus_stop, date, session):
 async def get_fixed_text_times(text_times):
     fixed_text_times = []
     for text_time in text_times:
-        text_time = await get_fixed_59_text_time(text_time)
-        text_time = await get_fixed_two_text_times(text_time)
-        if len(text_time) == 2:
+        if len(text_time) == 11:
+            text_time = await get_fixed_two_text_times(text_time)
             fixed_text_times.extend(text_time)
         else:
+            text_time = await get_fixed_59_text_time(text_time)
             fixed_text_times.append(text_time)
     return fixed_text_times
 
@@ -102,8 +102,8 @@ async def get_fixed_59_text_time(text_time):
 
 async def get_fixed_two_text_times(text_time):
     if len(text_time) == 11:
-        first_text_time = get_fixed_59_text_time(text_time[:5])
-        second_text_time = get_fixed_59_text_time(text_time[6:11])
+        first_text_time = await get_fixed_59_text_time(text_time[:5])
+        second_text_time = await get_fixed_59_text_time(text_time[6:11])
         return [first_text_time, second_text_time]
     return text_time
 
