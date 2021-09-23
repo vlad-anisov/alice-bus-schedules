@@ -1,14 +1,13 @@
 import asyncio
-import json
 import re
 from datetime import datetime, timedelta
 
-import requests
 from bs4 import BeautifulSoup
 import aiohttp
 
-from .models import Bus, BusStop, Direction
+from django.utils.timezone import make_aware
 from asgiref.sync import sync_to_async
+from .models import Bus, BusStop, Direction
 
 
 MAIN_URL = "https://kogda.by/routes/brest/autobus/"
@@ -59,51 +58,54 @@ async def get_names_of_bus_stops(direction, session):
 
 
 async def get_schedule(bus_stop, session):
-    date_string = datetime.now().strftime("%Y-%m-%d")
-    params = {
-        "city": "brest",
-        "transport": "autobus",
-        "route": bus_stop.direction.bus.name,
-        "direction": bus_stop.direction.name,
-        "busStop": bus_stop.name,
-        "date": date_string,
-    }
-    url = "https://kogda.by/api/getTimetable"
-    # async with session.get(url, params=params, headers={'User-Agent': 'Mozilla/5.0'}) as response:
-    response = requests.get("https://kogda.by/api/getTimetable", params, headers={'User-Agent': 'Mozilla/5.0'})
-    timetable = get_fixed_text_times(response.json()["timetable"])
-    schedules_for_today = [datetime.strptime(x + " " + date_string, "%H:%M %Y-%m-%d") for x in timetable]
+    date_for_today = datetime.now()
+    schedules_for_today = await get_schedule_for_date(bus_stop, date_for_today, session)
     date_for_tomorrow = datetime.now() + timedelta(days=1)
-    date_string = date_for_tomorrow.strftime("%Y-%m-%d")
-    params = {
-        "city": "brest",
-        "transport": "autobus",
-        "route": bus_stop.direction.bus.name,
-        "direction": bus_stop.direction.name,
-        "busStop": bus_stop.name,
-        "date": date_string,
-    }
-    url = "https://kogda.by/api/getTimetable"
-    # async with session.get(url, params=params, headers={'User-Agent': 'Mozilla/5.0'}) as response:
-    response = requests.get("https://kogda.by/api/getTimetable", params, headers={'User-Agent': 'Mozilla/5.0'})
-    timetable = get_fixed_text_times(response.json()["timetable"])
-    schedules_for_tomorrow = [datetime.strptime(x + " " + date_string, "%H:%M %Y-%m-%d") for x in timetable]
+    schedules_for_tomorrow = await get_schedule_for_date(bus_stop, date_for_tomorrow, session)
     return schedules_for_today + schedules_for_tomorrow
 
 
-def get_fixed_text_times(text_times):
+async def get_schedule_for_date(bus_stop, date, session):
+    url = "https://kogda.by/api/getTimetable"
+    date_string = date.strftime("%Y-%m-%d")
+    params = {
+        "city": "brest",
+        "transport": "autobus",
+        "route": bus_stop.direction.bus.name,
+        "direction": bus_stop.direction.name,
+        "busStop": bus_stop.name,
+        "date": date_string,
+    }
+    async with session.get(url, params=params, headers={'User-Agent': 'Mozilla/5.0'}) as response:
+        timetable = await response.json()
+        timetable = await get_fixed_text_times(timetable["timetable"])
+    return [make_aware(datetime.strptime(x + " " + date_string, "%H:%M %Y-%m-%d")) for x in timetable]
+
+
+async def get_fixed_text_times(text_times):
     fixed_text_times = []
     for text_time in text_times:
-        if text_time.split(":")[1] == "60":
-            fixed_text_time = f"{text_time.split(':')[0]}:59"
-            fixed_text_times.append(fixed_text_time)
-        if len(text_time) == 11:
-            first_text_time = text_time[:5]
-            second_text_time = text_time[6:11]
-            fixed_text_times.extend([first_text_time, second_text_time])
+        text_time = await get_fixed_59_text_time(text_time)
+        text_time = await get_fixed_two_text_times(text_time)
+        if len(text_time) == 2:
+            fixed_text_times.extend(text_time)
         else:
             fixed_text_times.append(text_time)
     return fixed_text_times
+
+
+async def get_fixed_59_text_time(text_time):
+    if int(text_time.split(":")[1]) > 59:
+        return f"{text_time.split(':')[0]}:59"
+    return text_time
+
+
+async def get_fixed_two_text_times(text_time):
+    if len(text_time) == 11:
+        first_text_time = get_fixed_59_text_time(text_time[:5])
+        second_text_time = get_fixed_59_text_time(text_time[6:11])
+        return [first_text_time, second_text_time]
+    return text_time
 
 
 async def create_bus_stops(direction, session):
@@ -156,4 +158,4 @@ async def update_all_db():
         await asyncio.gather(*tasks)
         now2 = datetime.now()
         duration = now2 - now
-        print(duration.total_seconds())
+        return duration.total_seconds()

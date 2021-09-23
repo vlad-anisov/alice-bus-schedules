@@ -19,6 +19,6 @@ def index(request):
 
 
 async def update_db(request):
-    await update_all_db()
-    return HttpResponse("OK")
+    update_time = await update_all_db()
+    return HttpResponse(update_time)
 
