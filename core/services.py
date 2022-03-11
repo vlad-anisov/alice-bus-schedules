@@ -1,8 +1,10 @@
+import math
 from datetime import datetime, timedelta
 
 import requests
 from rest_framework.response import Response
 from fuzzywuzzy import process
+import humanize
 
 from .models import Bus, BusStop, YandexUser, Direction
 from .dict2object import dict2object, Object
@@ -40,7 +42,9 @@ class Command:
         return False
 
     def _is_command_for_get_main_bus_schedule(self):
-        if self.words_from_command and self.words_from_command[0] in ['автобус', 'автобуса']:
+        if self.words_from_command and (self.words_from_command[0] in ['автобус', 'автобуса']
+                                        or 'мой' in self.words_from_command
+                                        or self.words_from_command == ['во', 'сколько', 'будет', 'автобус']):
             return True
         return False
 
@@ -224,7 +228,8 @@ class Skill:
         nearest_time_interval, next_time_interval = self._get_current_bus_time_interval(bus_stop)
         bus_name = bus_stop.direction.bus.name
         if nearest_time_interval and next_time_interval:
-            return f'Автобус номер {bus_name} будет через {nearest_time_interval}, а следующий через {next_time_interval}'
+            return f'Автобус номер {bus_name} будет через {nearest_time_interval}, а следующий через ' \
+                   f'{next_time_interval}'
         return ""
 
     def _get_current_bus_time_interval(self, bus_stop):
@@ -233,7 +238,9 @@ class Skill:
             time for time in schedules_for_today_and_tomorrow if self._is_current_bus_time(time)
         ]
         if len(current_bus_times) >= 2:
-            return [x.strftime("%H %M") if x.hour > 9 else x.strftime("%H %M")[1:] for x in current_bus_times[:2]]
+            now = datetime.now()
+            humanize.i18n.activate("ru_RU")
+            return [humanize.naturaldelta(x - now) for x in current_bus_times[:2]]
         return False, False
 
     def _get_current_bus_times(self, bus_stop):
